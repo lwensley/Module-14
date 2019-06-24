@@ -1,13 +1,15 @@
+// must run local server to see
+
 
 // Define connections
-var APILink = "http://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2014-01-01&endtime=2014-01-02&maxlongitude=-69.52148437&minlongitude=-123.83789062&maxlatitude=48.74894534&minlatitude=25.16517337";
-// var APILink = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson";
+var APILink = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
 var mapboxLink = "https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}";
 var attrCode = "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>";
-
+var platesdata = "https://github.com/fraxen/tectonicplates/blob/master/GeoJSON/PB2002_boundaries.json";
+var platesdata = "PB2002_boundaries.json";
 
 // function createMap(earthquakes, faultlines) {
-function createMap(earthquakes) {
+function createMap(earthquakes, tectonic) {
 
     // Create tile layer variables
     var outdoors = L.tileLayer(mapboxLink, {
@@ -44,16 +46,18 @@ function createMap(earthquakes) {
 
     //Create overlay object to hold our overlay layer
     var overlayMaps = {
-      "Earthquakes": earthquakes
+      "Earthquakes": earthquakes,
+      "Fault Lines": tectonic
       // ,
       // "Fault Lines": faultlines
     };
 
     // Create our map, giving it the streetmap and earthquakes layers to display on load
     var myMap = L.map("map", {
-      center: [37.7749, -122.4194],
-      zoom: 5,
-      layers: [satellite, earthquakes]
+      // center: [37.7749, -122.4194],
+      center: [0, 0],
+      zoom: 2.4,
+      layers: [satellite, earthquakes, tectonic]
       // layers: [satellite, earthquakes, faultlines]
     });
 
@@ -64,32 +68,25 @@ function createMap(earthquakes) {
       collapsed: false
     }).addTo(myMap);
 
-    // Set up the legend
-    var legend = L.control({ position: "bottomright" });
-    legend.onAdd = function() {
-      var div = L.DomUtil.create("div", "legend");
-      var labels = ["0-1", "1-2", "2-3", "3-4", "4-5", "5+"];
-      var colors = color;
-      var limits = [];
 
-      // Add min & max
-      var legendInfo = "<h1>Median Income</h1>" +
-        "<div class=\"labels\">" +
-          "<div class=\"min\">" + limits[0] + "</div>" +
-          "<div class=\"max\">" + limits[limits.length - 1] + "</div>" +
-        "</div>";
+    var legend = L.control({position: 'bottomright'});
 
-      div.innerHTML = legendInfo;
+    legend.onAdd = function (map) {
 
-      limits.forEach(function(limit, index) {
-        labels.push("<li style=\"background-color: " + colors[index] + "\"></li>");
-      });
+        var div = L.DomUtil.create('div', 'info legend'),
+            groups = [0, 1, 2, 3, 4, 5],
+            labels = ["0-1", "1-2", "2-3", "3-4", "4-5", "5+"];
 
-      div.innerHTML += "<ul>" + labels.join("") + "</ul>";
-      return div;
+        // loop through our density intervals and generate a label with a colored square for each interval
+        for (var i = 0; i < groups.length; i++) {
+            div.innerHTML +=
+                '<i style="background:' + getColor(groups[i] + 1) + '"></i> ' +
+                groups[i] + (groups[i + 1] ? '&ndash;' + groups[i + 1] + '<br>' : '+');
+        }
+
+        return div;
     };
 
-    // Adding legend to the map
     legend.addTo(myMap);
 
 }
@@ -127,6 +124,15 @@ function markerColor(feature) {
   };
 }
 
+//alternative function to determine color only
+function getColor(magnitude) {
+  return  magnitude > 5 ? "#EBFF0D" :
+          magnitude > 4 ? "#B4FF09" :
+          magnitude > 3 ? "#00E50F" :
+          magnitude > 2 ? "#00FFE2" :
+          magnitude > 1 ? "#00BDFF" :
+          "#003AFF";
+}
 
 // var earthquakes;
 // var faultlines;
@@ -156,9 +162,6 @@ function createFeatures(earthquakeData) {
     return L.circleMarker(latlng, earthQMarkers);
   }
 
-  // var faultlines = L.geoJSON(faultlinedata, {
-  //   onEachFeature: onEachFeature
-  // });
 
   // Create a GeoJSON layer containing the features array on the earthquakeData object
   // Run the onEachFeature function once for each piece of data in the array
@@ -167,15 +170,33 @@ function createFeatures(earthquakeData) {
     pointToLayer: pointToLayer
   });
 
+  d3.json(platesdata, function(platesdata) {
+
+    var plates = {
+      "color": "orange",
+      "weight": 2,
+      "opacity": .5,
+      fillOpacity: 0,
+      };
+
+    var tectonic = L.geoJSON(platesdata, {
+      style: plates
+      });
+
   // Sending our earthquakes layer to the createMap function
   // createMap(earthquakes, faultlines);
-  createMap(earthquakes);
+  createMap(earthquakes, tectonic);
+})
 }
+
+
 
 // Perform a GET request to the query URL
 d3.json(APILink, function(data) {
+
   // Once we get a response, send the data.features object to the createFeatures function
   createFeatures(data.features);
+
 });
 
 
